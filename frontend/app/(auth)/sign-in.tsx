@@ -105,12 +105,6 @@ const Page = () => {
             <TouchableOpacity style={styles.socialButton}>
               <FontAwesome name="google" size={20} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome name="apple" size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome name="facebook" size={20} color="white" />
-            </TouchableOpacity>
           </View>
           
           <View style={styles.signupContainer}>
