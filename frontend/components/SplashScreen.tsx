@@ -16,6 +16,7 @@ const GradientText = ({ children, style }: { children: string; style?: any }) =>
     </MaskedView>
   );
 };
+export { GradientText };
 
 export default function SplashScreen() {
   return (

@@ -1,112 +1,324 @@
-import * as React from 'react'
-import { Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { useSignUp } from '@clerk/clerk-expo'
-import { Link, useRouter } from 'expo-router'
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { GradientText } from '@/components/SplashScreen'
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const router = useRouter()
+const { width, height } = Dimensions.get('window');
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [pendingVerification, setPendingVerification] = React.useState(false)
-  const [code, setCode] = React.useState('')
+const Page = () => {
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [screenDimensions, setScreenDimensions] = useState({ width, height });
 
-  // Handle submission of sign-up form
-  const onSignUpPress = async () => {
-    if (!isLoaded) return
+  // Handle screen rotation or dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions({ width: window.width, height: window.height });
+    });
+    
+    return () => subscription?.remove();
+  }, []);
 
-    console.log(emailAddress, password)
-
-    // Start sign-up process using email and password provided
-    try {
-      await signUp.create({
-        emailAddress,
-        password,
-      })
-
-      // Send user an email with verification code
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-
-      // Set 'pendingVerification' to true to display second form
-      // and capture OTP code
-      setPendingVerification(true)
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
-    }
-  }
-
-  // Handle submission of verification form
-  const onVerifyPress = async () => {
-    if (!isLoaded) return
-
-    try {
-      // Use the code the user provided to attempt verification
-      const signUpAttempt = await signUp.attemptEmailAddressVerification({
-        code,
-      })
-
-      // If verification was completed, set the session to active
-      // and redirect the user
-      if (signUpAttempt.status === 'complete') {
-        await setActive({ session: signUpAttempt.createdSessionId })
-        router.replace('/')
-      } else {
-        // If the status is not complete, check why. User may need to
-        // complete further steps.
-        console.error(JSON.stringify(signUpAttempt, null, 2))
-      }
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
-    }
-  }
-
-  if (pendingVerification) {
-    return (
-      <>
-        <Text>Verify your email</Text>
-        <TextInput
-          value={code}
-          placeholder="Enter your verification code"
-          onChangeText={(code) => setCode(code)}
-        />
-        <TouchableOpacity onPress={onVerifyPress}>
-          <Text>Verify</Text>
-        </TouchableOpacity>
-      </>
-    )
-  }
+  const isSmallDevice = screenDimensions.height < 700;
 
   return (
-    <View>
-      <>
-        <Text>Sign up</Text>
-        <TextInput
-          autoCapitalize="none"
-          value={emailAddress}
-          placeholder="Enter email"
-          onChangeText={(email) => setEmailAddress(email)}
-        />
-        <TextInput
-          value={password}
-          placeholder="Enter password"
-          secureTextEntry={true}
-          onChangeText={(password) => setPassword(password)}
-        />
-        <TouchableOpacity onPress={onSignUpPress}>
-          <Text>Continue</Text>
-        </TouchableOpacity>
-        <View style={{ display: 'flex', flexDirection: 'row', gap: 3 }}>
-          <Text>Already have an account?</Text>
-          <Link href="/sign-in">
-            <Text>Sign in</Text>
-          </Link>
+    <ScrollView 
+      style={styles.scrollContainer}
+      contentContainerStyle={[
+        styles.scrollContent,
+        { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }
+      ]}
+    >
+      <View style={styles.container}>
+        <View style={styles.divider} />
+        <GradientText style={[styles.gradientText, isSmallDevice && styles.smallText]}>
+          Join Swyp
+        </GradientText>
+        <Text style={styles.text}>Create an account to start your journey</Text>
+        
+        <View style={styles.formContainer}>
+         
+          
+          <View style={styles.inputWrapper}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+             style={styles.input}
+             placeholder="Enter your email" 
+             placeholderTextColor="grey"
+             value={email}
+             onChange={(e) => setEmail(e.nativeEvent.text)}
+             keyboardType="email-address"
+             autoCapitalize="none"
+             />
+          </View>
+          
+          <View style={styles.inputWrapper}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+               style={styles.passwordInput}
+               placeholder="Create a password" 
+               placeholderTextColor="grey"
+               value={password}
+               onChange={(e) => setPassword(e.nativeEvent.text)}
+               secureTextEntry={!showPassword}
+               autoCapitalize="none"
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons 
+                  name={showPassword ? 'eye-off' : 'eye'} 
+                  size={24} 
+                  color="white"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={styles.inputWrapper}>
+            <Text style={styles.label}>Confirm Password</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+               style={styles.passwordInput}
+               placeholder="Confirm your password" 
+               placeholderTextColor="grey"
+               value={confirmPassword}
+               onChange={(e) => setConfirmPassword(e.nativeEvent.text)}
+               secureTextEntry={!showConfirmPassword}
+               autoCapitalize="none"
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon}
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                <Ionicons 
+                  name={showConfirmPassword ? 'eye-off' : 'eye'} 
+                  size={24} 
+                  color="white"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={styles.termsText}>
+            By signing up, you agree to our{' '}
+            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
+            <Text style={styles.termsLink}>Privacy Policy</Text>
+          </Text>
+          
+          <TouchableOpacity style={styles.signUpButton}>
+            <LinearGradient 
+              colors={['#4c8df5', '#3d7ef1', '#2b6be8']} 
+              style={styles.gradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.buttonText}>Create Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          <View style={styles.orContainer}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+          
+          <View style={styles.socialContainer}>
+            <TouchableOpacity style={styles.socialButton}>
+              <FontAwesome name="google" size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <FontAwesome name="apple" size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton}>
+              <FontAwesome name="facebook" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.signinContainer}>
+            <Text style={styles.signinText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => router.replace('/sign-in')}>
+              <Text style={styles.signinLink}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </>
-    </View>
+      </View>
+    </ScrollView> 
   )
 }
+
+export default Page
+
+const styles = StyleSheet.create({
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  container: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'black',
+    paddingHorizontal: width * 0.05, // 5% of screen width
+    paddingVertical: height * 0.02, // 2% of screen height
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  divider: {
+    marginTop: Platform.OS === 'ios' ? height * 0.04 : height * 0.02,
+    marginBottom: height * 0.03,
+    height: 3,
+    width: '100%',
+    backgroundColor: 'white',
+  },
+  gradientText: {
+    fontSize: Math.min(30, width * 0.08), // Responsive font size
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  smallText: {
+    fontSize: Math.min(26, width * 0.07), // Smaller font for small devices
+  },
+  text: {
+    fontSize: Math.min(15, width * 0.04),
+    color: '#e0e0e0',
+    marginBottom: height * 0.03,
+  },
+  formContainer: {
+    width: '100%',
+    marginTop: height * 0.01,
+  },
+  inputWrapper: {
+    width: '100%',
+    marginBottom: height * 0.02,
+  },
+  label: {
+    fontSize: Math.min(15, width * 0.04),
+    color: '#a0a0a0',
+    marginBottom: 8,
+  },
+  input: {
+    height: Platform.OS === 'ios' ? height * 0.06 : height * 0.07,
+    width: '100%',
+    borderRadius: 10,
+    backgroundColor: '#111827',
+    paddingLeft: 15,
+    color: 'white',
+    fontSize: Math.min(16, width * 0.04),
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: Platform.OS === 'ios' ? height * 0.06 : height * 0.07,
+    borderRadius: 10,
+    backgroundColor: '#111827',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    paddingLeft: 15,
+    color: 'white',
+    fontSize: Math.min(16, width * 0.04),
+  },
+  eyeIcon: {
+    padding: 10,
+    position: 'absolute',
+    right: 5,
+  },
+  termsText: {
+    color: '#a0a0a0',
+    fontSize: Math.min(12, width * 0.03),
+    textAlign: 'center',
+    marginBottom: height * 0.02,
+    lineHeight: 18,
+  },
+  termsLink: {
+    color: '#4c8df5',
+  },
+  signUpButton: {
+    width: '100%',
+    height: Platform.OS === 'ios' ? height * 0.06 : height * 0.07,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: height * 0.015,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  gradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: Math.min(16, width * 0.04),
+    fontWeight: 'bold',
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: height * 0.025,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#444',
+  },
+  orText: {
+    color: '#aaa',
+    paddingHorizontal: 10,
+    fontSize: Math.min(14, width * 0.035),
+  },
+  socialContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: height * 0.02,
+  },
+  socialButton: {
+    width: width * 0.12,
+    height: width * 0.12,
+    borderRadius: width * 0.06,
+    backgroundColor: '#222',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  signinContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: height * 0.02,
+    marginBottom: height * 0.04,
+  },
+  signinText: {
+    color: '#e0e0e0',
+    fontSize: Math.min(14, width * 0.035),
+  },
+  signinLink: {
+    color: '#4c8df5',
+    fontSize: Math.min(14, width * 0.035),
+    fontWeight: 'bold',
+  }
+})
