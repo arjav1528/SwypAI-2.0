@@ -1,30 +1,101 @@
-import { StyleSheet, Text, TextInput, View, TouchableOpacity, Image, ScrollView, Dimensions, Platform } from 'react-native'
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { GradientText } from '@/components/SplashScreen'
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, FontAwesome } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSignIn } from '@clerk/clerk-expo'
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window')
 
-const Page = () => {
-  const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState('')
+export default function SignInScreen() {
+  const insets = useSafeAreaInsets()
+  const { isLoaded, signIn, setActive } = useSignIn()
+  const router = useRouter()
+  
+  // Form state
+  const [emailAddress, setEmailAddress] = useState('')
   const [password, setPassword] = useState('')
+  
+  // UI state
   const [showPassword, setShowPassword] = useState(false)
-  const [screenDimensions, setScreenDimensions] = useState({ width, height });
+  const [screenDimensions, setScreenDimensions] = useState({ width, height })
+  
+  // Error handling state
+  const [emailError, setEmailError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [generalError, setGeneralError] = useState('')
+
+  // Clear errors on input change
+  const clearErrors = () => {
+    setEmailError('')
+    setPasswordError('')
+    setGeneralError('')
+  }
 
   // Handle screen rotation or dimension changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setScreenDimensions({ width: window.width, height: window.height });
-    });
+      setScreenDimensions({ width: window.width, height: window.height })
+    })
     
-    return () => subscription?.remove();
-  }, []);
+    return () => subscription?.remove()
+  }, [])
 
-  const isSmallDevice = screenDimensions.height < 700;
+  const isSmallDevice = screenDimensions.height < 700
+  
+  // Handle sign in
+  const onSignInPress = async () => {
+    if (!isLoaded) return
+    
+    // Clear previous errors
+    clearErrors()
+    
+    // Client-side validations
+    if (!emailAddress.trim()) {
+      setEmailError('Email is required')
+      return
+    }
+    
+    if (!password) {
+      setPasswordError('Password is required')
+      return
+    }
+
+    try {
+      const result = await signIn.create({
+        identifier: emailAddress,
+        password,
+      })
+      
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId })
+        router.replace('/')
+      } else {
+        // This can happen when 2FA is enabled
+        console.log(JSON.stringify(result, null, 2))
+        setGeneralError('Additional steps needed to sign in')
+      }
+    } catch (err: any) {  // Add ": any" here
+      console.error(JSON.stringify(err, null, 2))
+      
+      // Check for specific error types and show appropriate message
+      if (err.errors && err.errors.length > 0) {
+        const error = err.errors[0]
+        
+        if (error.code === 'form_identifier_not_found') {
+          setEmailError('No account found with this email')
+        } else if (error.code === 'form_password_incorrect') {
+          setPasswordError('Incorrect password')
+        } else {
+          setGeneralError(error.message || 'Failed to sign in')
+        }
+      } else {
+        setGeneralError('An error occurred during sign in')
+      }
+    }
+  }
 
   return (
     <ScrollView 
@@ -41,29 +112,40 @@ const Page = () => {
         </GradientText>
         <Text style={styles.text}>Sign in to continue your personalized experience</Text>
         
+        {generalError ? <Text style={styles.errorText}>{generalError}</Text> : null}
+        
         <View style={styles.formContainer}>
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>Email</Text>
             <TextInput
-             style={styles.input}
+             style={[styles.input, emailError ? styles.inputError : null]}
              placeholder="Enter your email" 
              placeholderTextColor="grey"
-             value={email}
-             onChange={(e) => setEmail(e.nativeEvent.text)}
+             value={emailAddress}
+             onChangeText={(text) => {
+              setEmailAddress(text)
+              setEmailError('')
+              setGeneralError('')
+             }}
              keyboardType="email-address"
              autoCapitalize="none"
-             />
+            />
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
           </View>
           
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordContainer}>
+            <View style={[styles.passwordContainer, passwordError ? styles.inputError : null]}>
               <TextInput
                style={styles.passwordInput}
                placeholder="Enter your password" 
                placeholderTextColor="grey"
                value={password}
-               onChange={(e) => setPassword(e.nativeEvent.text)}
+               onChangeText={(text) => {
+                setPassword(text)
+                setPasswordError('')
+                setGeneralError('')
+               }}
                secureTextEntry={!showPassword}
                autoCapitalize="none"
               />
@@ -78,13 +160,14 @@ const Page = () => {
                 />
               </TouchableOpacity>
             </View>
+            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
           </View>
 
           <TouchableOpacity style={styles.forgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.signInButton}>
+          <TouchableOpacity style={styles.signInButton} onPress={onSignInPress}>
             <LinearGradient 
               colors={['#4c8df5', '#3d7ef1', '#2b6be8']} 
               style={styles.gradient}
@@ -118,8 +201,6 @@ const Page = () => {
     </ScrollView> 
   )
 }
-
-export default Page
 
 const styles = StyleSheet.create({
   scrollContainer: {
@@ -181,6 +262,15 @@ const styles = StyleSheet.create({
     fontSize: Math.min(16, width * 0.04),
     borderWidth: 1,
     borderColor: '#2a2a2a',
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    marginTop: 5,
+    fontSize: Math.min(12, width * 0.03),
   },
   passwordContainer: {
     flexDirection: 'row',

@@ -3,6 +3,7 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Redirect, useRouter } from 'expo-router';
 import { Text, View, StyleSheet, SafeAreaView, ActivityIndicator, Image } from 'react-native';
 import SplashScreen from '@/components/SplashScreen';
+import { SignOutButton } from '@/components/SignOutButton';
 
 
 const Page = () => {
@@ -34,6 +35,7 @@ const Page = () => {
       <View style={styles.content}>
         <Text style={styles.title}>Welcome {user?.firstName}!</Text>
         <Text style={styles.subtitle}>You are signed in.</Text>
+        <SignOutButton />
       </View>
     </SafeAreaView>
     
