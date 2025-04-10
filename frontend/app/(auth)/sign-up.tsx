@@ -1,46 +1,61 @@
-import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native'
-import React, { useState, useEffect } from 'react'
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform, ActivityIndicator, Animated } from 'react-native'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { GradientText } from '@/components/SplashScreen'
 import { Ionicons, FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useSignUp } from '@clerk/clerk-expo'
+import { useSignUp, useSSO } from '@clerk/clerk-expo'
+import * as WebBrowser from 'expo-web-browser'
+import * as AuthSession from 'expo-auth-session'
 
 const { width, height } = Dimensions.get('window')
 
+export const useWarmUpBrowser = () => {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync()
+    return () => {
+      void WebBrowser.coolDownAsync()
+    }
+  }, [])
+}
+
+WebBrowser.maybeCompleteAuthSession()
+
 export default function SignUpScreen() {
+  useWarmUpBrowser()
+  
+  const { startSSOFlow } = useSSO()
   const insets = useSafeAreaInsets()
   const { isLoaded, signUp, setActive } = useSignUp()
   const router = useRouter()
   
-  // Form state
   const [emailAddress, setEmailAddress] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pendingVerification, setPendingVerification] = useState(false)
   const [code, setCode] = useState('')
   
-  // UI state
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [screenDimensions, setScreenDimensions] = useState({ width, height })
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   
-  // Error handling state
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [codeError, setCodeError] = useState('')
   const [generalError, setGeneralError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  
+  const fadeAnim = useRef(new Animated.Value(1)).current
+  const spinnerFadeAnim = useRef(new Animated.Value(0)).current
 
-  // Clear errors on input change
   const clearErrors = () => {
     setEmailError('')
     setPasswordError('')
     setGeneralError('')
   }
 
-  // Handle screen rotation or dimension changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setScreenDimensions({ width: window.width, height: window.height })
@@ -48,18 +63,83 @@ export default function SignUpScreen() {
     
     return () => subscription?.remove()
   }, [])
+  
+  useEffect(() => {
+    if (isGoogleLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(spinnerFadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(spinnerFadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+  }, [isGoogleLoading])
 
   const isSmallDevice = screenDimensions.height < 700
 
-  // Handle submission of sign-up form
+  const handleGoogleSignUp = useCallback(async () => {
+    try {
+      clearErrors()
+      
+      setIsGoogleLoading(true)
+      
+      const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: AuthSession.makeRedirectUri(),
+      })
+
+      if (createdSessionId) {
+        if(setActive){
+          await setActive({ session: createdSessionId })
+          router.replace('/')
+        }else{
+          setGeneralError('Failed to set active session')
+        }
+      } else {
+        setGeneralError('Sign up process was not completed')
+      }
+    } catch (err: any) {
+      console.error('Error during OAuth:', JSON.stringify(err, null, 2))
+      
+      if (err?.message?.includes('cancelled') || err?.message?.includes('dismiss')) {
+        setGeneralError('Sign up was cancelled')
+      } else if (err?.message?.includes('network')) {
+        setGeneralError('Network error. Please check your connection and try again')
+      } else if (err?.errors && err.errors.length > 0) {
+        setGeneralError(err.errors[0].message || 'Failed to sign up with Google')
+      } else {
+        setGeneralError('Failed to sign up with Google. Please try again')
+      }
+    } finally {
+      setIsGoogleLoading(false)
+    }
+  }, [startSSOFlow, setActive, router, clearErrors])
+
   const onSignUpPress = async () => {
     if (!isLoaded) return
     
-    // Clear previous errors
     clearErrors()
     setSuccessMessage('')
     
-    // Client-side validations
     if (!emailAddress.trim()) {
       setEmailError('Email is required')
       return
@@ -80,25 +160,19 @@ export default function SignUpScreen() {
       return
     }
 
-    // Start sign-up process using email and password provided
     try {
       await signUp.create({
         emailAddress,
         password,
       })
 
-      // Send user an email with verification code
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
 
-      // Set 'pendingVerification' to true to display second form
-      // and capture OTP code
       setPendingVerification(true)
       setSuccessMessage('Verification code sent to your email')
-    } catch (err: any) {  // Add ": any" here
-      // Handle Clerk errors
+    } catch (err: any) {
       console.error(JSON.stringify(err, null, 2))
       
-      // Check for specific error types and show appropriate message
       if (err.errors && err.errors.length > 0) {
         const error = err.errors[0]
         
@@ -117,7 +191,6 @@ export default function SignUpScreen() {
     }
   }
 
-  // Handle submission of verification form
   const onVerifyPress = async () => {
     if (!isLoaded) return
     setCodeError('')
@@ -128,13 +201,10 @@ export default function SignUpScreen() {
     }
 
     try {
-      // Use the code the user provided to attempt verification
       const signUpAttempt = await signUp.attemptEmailAddressVerification({
         code,
       })
 
-      // If verification was completed, set the session to active
-      // and redirect the user
       if (signUpAttempt.status === 'complete') {
         await setActive({ session: signUpAttempt.createdSessionId })
         router.replace('/')
@@ -142,10 +212,9 @@ export default function SignUpScreen() {
         console.error(JSON.stringify(signUpAttempt, null, 2))
         setCodeError('Verification failed. Please try again')
       }
-    } catch (err: any) {  // Add ": any" here
+    } catch (err: any) {
       console.error(JSON.stringify(err, null, 2))
       
-      // Parse verification errors
       if (err.errors && err.errors.length > 0) {
         const error = err.errors[0]
         
@@ -200,7 +269,7 @@ export default function SignUpScreen() {
               try {
                 await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
                 setSuccessMessage('Verification code resent to your email');
-              } catch (err: any) {  // Add ": any" here
+              } catch (err: any) {
                 setCodeError('Failed to resend code. Please try again');
               }
             }}>
@@ -342,8 +411,20 @@ export default function SignUpScreen() {
           </View>
           
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome name="google" size={20} color="white" />
+            <TouchableOpacity 
+              style={[
+                styles.socialButton,
+                isGoogleLoading ? styles.socialButtonLoading : null
+              ]} 
+              onPress={handleGoogleSignUp}
+              disabled={isGoogleLoading}
+            >
+              <Animated.View style={{ opacity: fadeAnim, position: 'absolute' }}>
+                <FontAwesome name="google" size={20} color="white" />
+              </Animated.View>
+              <Animated.View style={{ opacity: spinnerFadeAnim }}>
+                <ActivityIndicator size="small" color="white" />
+              </Animated.View>
             </TouchableOpacity>
           </View>
           
@@ -520,6 +601,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderWidth: 1,
     borderColor: '#444',
+  },
+  socialButtonLoading: {
+    backgroundColor: '#333',
   },
   signinContainer: {
     flexDirection: 'row',

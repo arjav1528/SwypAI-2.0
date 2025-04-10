@@ -1,40 +1,57 @@
-import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native'
-import React, { useState, useEffect } from 'react'
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, Dimensions, Platform, Linking, ActivityIndicator, Animated } from 'react-native'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { GradientText } from '@/components/SplashScreen'
+import * as WebBrowser from 'expo-web-browser'
+import * as AuthSession from 'expo-auth-session'
 import { Ionicons, FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useSignIn } from '@clerk/clerk-expo'
+import { useSignIn, useSSO } from '@clerk/clerk-expo'
 
 const { width, height } = Dimensions.get('window')
 
+
+export const useWarmUpBrowser = () => {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync()
+    return () => {
+      void WebBrowser.coolDownAsync()
+    }
+  }, [])
+}
+
+WebBrowser.maybeCompleteAuthSession()
+
 export default function SignInScreen() {
+  useWarmUpBrowser()
+
+  const { startSSOFlow } = useSSO()
+
   const insets = useSafeAreaInsets()
   const { isLoaded, signIn, setActive } = useSignIn()
   const router = useRouter()
   
-  // Form state
   const [emailAddress, setEmailAddress] = useState('')
   const [password, setPassword] = useState('')
   
-  // UI state
   const [showPassword, setShowPassword] = useState(false)
   const [screenDimensions, setScreenDimensions] = useState({ width, height })
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   
-  // Error handling state
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [generalError, setGeneralError] = useState('')
 
-  // Clear errors on input change
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const spinnerFadeAnim = useRef(new Animated.Value(0)).current;
+
   const clearErrors = () => {
     setEmailError('')
     setPasswordError('')
     setGeneralError('')
   }
 
-  // Handle screen rotation or dimension changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setScreenDimensions({ width: window.width, height: window.height })
@@ -44,15 +61,85 @@ export default function SignInScreen() {
   }, [])
 
   const isSmallDevice = screenDimensions.height < 700
+
+  const handleGoogleSignIn = useCallback(async () => {
+    if (!isLoaded) {
+      setGeneralError('Authentication system is not ready. Please try again.');
+      return;
+    }
+    
+    try {
+      clearErrors();
+      
+      setIsGoogleLoading(true);
+      
+      const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: AuthSession.makeRedirectUri(),
+      });
+
+      if (createdSessionId) {
+        if (setActive) {  // Add a null check here
+          await setActive({ session: createdSessionId });
+          router.replace('/');
+        } else {
+          setGeneralError('Session activation failed. Please try again.');
+        }
+      } else {
+        setGeneralError('Sign in process was not completed.');
+      }
+    } catch (err: any) {
+      console.error('Error during OAuth:', JSON.stringify(err, null, 2));
+      
+      if (err?.message?.includes('cancelled') || err?.message?.includes('dismiss')) {
+        setGeneralError('Sign in was cancelled.');
+      } else if (err?.message?.includes('network')) {
+        setGeneralError('Network error. Please check your connection and try again.');
+      } else if (err?.errors && err.errors.length > 0) {
+        setGeneralError(err.errors[0].message || 'Failed to sign in with Google.');
+      } else {
+        setGeneralError('Failed to sign in with Google. Please try again.');
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  }, [startSSOFlow, setActive, router, clearErrors]);
+
+  useEffect(() => {
+    if (isGoogleLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(spinnerFadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(spinnerFadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isGoogleLoading]);
   
-  // Handle sign in
   const onSignInPress = async () => {
     if (!isLoaded) return
     
-    // Clear previous errors
     clearErrors()
     
-    // Client-side validations
     if (!emailAddress.trim()) {
       setEmailError('Email is required')
       return
@@ -73,14 +160,12 @@ export default function SignInScreen() {
         await setActive({ session: result.createdSessionId })
         router.replace('/')
       } else {
-        // This can happen when 2FA is enabled
         console.log(JSON.stringify(result, null, 2))
         setGeneralError('Additional steps needed to sign in')
       }
-    } catch (err: any) {  // Add ": any" here
+    } catch (err: any) {
       console.error(JSON.stringify(err, null, 2))
       
-      // Check for specific error types and show appropriate message
       if (err.errors && err.errors.length > 0) {
         const error = err.errors[0]
         
@@ -185,8 +270,19 @@ export default function SignInScreen() {
           </View>
           
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <FontAwesome name="google" size={20} color="white" />
+            <TouchableOpacity 
+              style={[
+                styles.socialButton,
+                isGoogleLoading ? styles.socialButtonLoading : null
+              ]} 
+              onPress={handleGoogleSignIn}
+              disabled={isGoogleLoading}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <FontAwesome name="google" size={20} color="white" />
+              )}
             </TouchableOpacity>
           </View>
           
@@ -214,8 +310,8 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: 'black',
-    paddingHorizontal: width * 0.05, // 5% of screen width
-    paddingVertical: height * 0.02, // 2% of screen height
+    paddingHorizontal: width * 0.05,
+    paddingVertical: height * 0.02,
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
   },
@@ -227,12 +323,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   gradientText: {
-    fontSize: Math.min(30, width * 0.08), // Responsive font size
+    fontSize: Math.min(30, width * 0.08),
     fontWeight: 'bold',
     marginBottom: 10,
   },
   smallText: {
-    fontSize: Math.min(26, width * 0.07), // Smaller font for small devices
+    fontSize: Math.min(26, width * 0.07),
   },
   text: {
     fontSize: Math.min(15, width * 0.04),
@@ -356,6 +452,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderWidth: 1,
     borderColor: '#444',
+  },
+  socialButtonLoading: {
+    backgroundColor: '#333',
+    borderColor: '#4c8df5',
   },
   signupContainer: {
     flexDirection: 'row',
