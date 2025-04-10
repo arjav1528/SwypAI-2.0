@@ -4,6 +4,8 @@ const cookieParser = require('cookie-parser');
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./src/database/connectDB');
+const HealthCheckRoute = require('./src/routes/HealthCheckRoute');
+const UserRouter = require('./src/routes/UserRoute');
 dotenv.config();
 
 
@@ -15,6 +17,17 @@ app.use(express.static('public'));
 app.use(express.static('uploads'));
 
 const PORT = process.env.PORT || 3000;
+
+app.use('/api/healthCheck', HealthCheckRoute);
+
+app.use('/api/user', UserRouter);
+app.get('/', (req, res) => {
+    res.send('Welcome to the API');
+});
+
+
+
+
 
 connectDB().then(() => {
     app.listen(PORT, () => {
