@@ -6,6 +6,8 @@ const userSchema = new mongoose.Schema(
         clerkId: {
             type: String,
             required: true,
+            unique: true,
+            trim: true
         },
         email : {
             type: String,
@@ -17,6 +19,7 @@ const userSchema = new mongoose.Schema(
         gender : {
             type: String,
             required: false,
+            default : null
         },
         preferGenres : {
             type: Array,
@@ -27,6 +30,7 @@ const userSchema = new mongoose.Schema(
         age : {
             type: Number,
             required: false,
+            default: null
         },
         savedQuotes : {
             type: Array,

@@ -112,7 +112,6 @@ const addUserController = async (req,res) => {
             if(!evt) {
                 return res.status(400).json(new APIError(400, "Invalid request", [], "Invalid request"));
             }
-            console.log(evt);
             
             const clerkId = evt.data.id
             const email = evt.data.email_addresses[0].email_address;
