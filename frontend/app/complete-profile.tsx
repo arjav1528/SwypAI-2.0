@@ -3,8 +3,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { GradientText } from '@/components/SplashScreen'
 import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, Redirect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useAuth, useUser } from '@clerk/clerk-expo'
+import SplashScreen from '@/components/SplashScreen'
 
 const { width, height } = Dimensions.get('window')
 
@@ -34,6 +36,8 @@ const GENDER_OPTIONS = [
 export default function CompleteProfileScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const { isSignedIn, isLoaded } = useAuth()
+  const { user, isLoaded: isUserLoaded } = useUser()
   
   const [screenDimensions, setScreenDimensions] = useState({ width, height })
   const [selectedGenres, setSelectedGenres] = useState<number[]>([])
@@ -145,7 +149,7 @@ export default function CompleteProfileScreen() {
     }
   }
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     let isValid = true
 
     if (!age.trim() || isNaN(Number(age)) || Number(age) < 13 || Number(age) > 100) {
@@ -159,10 +163,42 @@ export default function CompleteProfileScreen() {
     }
 
     if (isValid) {
-      // Here would go the API call to save profile information
-      // For now, we'll just navigate to the home screen
-      router.replace('/')
+      try {
+        // Map the genre IDs to their names
+        const selectedGenreNames = selectedGenres.map(
+          genreId => GENRES.find(genre => genre.id === genreId)?.name || ''
+        ).filter(name => name !== '');
+
+        // Save the profile data with genre names instead of IDs
+        await user?.update({
+          unsafeMetadata: {
+            age: Number(age),
+            gender: selectedGender || 'prefer_not',
+            preferGenres: selectedGenreNames // Store names instead of IDs
+          }
+        })
+        
+        // Navigate to home after successful save
+        router.replace('/');
+      } catch (error) {
+        console.error("Error saving profile:", error)
+        // Handle error - could add an error state and display it
+      }
     }
+  }
+
+  if (!isLoaded || !isUserLoaded) {
+    return null; // Return empty instead of splash screen
+  }
+  
+  // If not signed in, redirect to sign-in
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/sign-in" />
+  }
+  
+  // If user already has metadata (profile completed), redirect to home
+  if (user?.publicMetadata && Object.keys(user.publicMetadata).length > 0) {
+    return <Redirect href="/" />
   }
 
   return (
@@ -287,13 +323,7 @@ export default function CompleteProfileScreen() {
             </LinearGradient>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={styles.skipButton} 
-            onPress={() => router.replace('/')}
-            activeOpacity={0.6}
-          >
-            <Text style={styles.skipText}>Skip for now</Text>
-          </TouchableOpacity>
+          
         </View>
       </View>
     </ScrollView>

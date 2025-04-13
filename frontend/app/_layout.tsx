@@ -3,6 +3,7 @@ import { tokenCache } from '@clerk/clerk-expo/token-cache'
 import { Slot, Stack } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { View, StyleSheet } from 'react-native'
+import SplashScreen from '@/components/SplashScreen'
 
 export default function RootLayout() {
   const [initialized, setInitialized] = useState(false)
@@ -12,20 +13,26 @@ export default function RootLayout() {
   }
 
   useEffect(() => {
-    // Simulate initialization delay
-    setInitialized(true)
+    // Simulate initialization delay - this is the ONLY place in the app 
+    // where we should show the splash screen during initial load
+    const timer = setTimeout(() => {
+      setInitialized(true)
+    }, 1500)
+    
+    return () => clearTimeout(timer)
   }, [])
 
   if (!initialized) {
-    return <View style={styles.container} />
+    return <SplashScreen />
   }
 
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
       <ClerkLoaded>
-        <Stack>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="complete-profile" />
         </Stack>
       </ClerkLoaded>
     </ClerkProvider>
@@ -35,6 +42,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: 'black',
   }
 })

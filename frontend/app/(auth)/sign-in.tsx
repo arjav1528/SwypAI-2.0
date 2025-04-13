@@ -5,9 +5,10 @@ import * as WebBrowser from 'expo-web-browser'
 import * as AuthSession from 'expo-auth-session'
 import { Ionicons, FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, Redirect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useSignIn, useSSO } from '@clerk/clerk-expo'
+import { useSignIn, useSSO, useAuth, useUser } from '@clerk/clerk-expo'
+import SplashScreen from '@/components/SplashScreen'
 
 const { width, height } = Dimensions.get('window')
 
@@ -27,7 +28,8 @@ export default function SignInScreen() {
   useWarmUpBrowser()
 
   const { startSSOFlow } = useSSO()
-
+  const { isSignedIn, isLoaded: isAuthLoaded } = useAuth()
+  const { user, isLoaded: isUserLoaded } = useUser()
   const insets = useSafeAreaInsets()
   const { isLoaded, signIn, setActive } = useSignIn()
   const router = useRouter()
@@ -63,11 +65,6 @@ export default function SignInScreen() {
   const isSmallDevice = screenDimensions.height < 700
 
   const handleGoogleSignIn = useCallback(async () => {
-    if (!isLoaded) {
-      setGeneralError('Authentication system is not ready. Please try again.');
-      return;
-    }
-    
     try {
       clearErrors();
       
@@ -79,7 +76,7 @@ export default function SignInScreen() {
       });
 
       if (createdSessionId) {
-        if (setActive) {  // Add a null check here
+        if (setActive) {
           await setActive({ session: createdSessionId });
           router.replace('/');
         } else {
@@ -182,6 +179,19 @@ export default function SignInScreen() {
     }
   }
 
+  if (!isAuthLoaded || !isUserLoaded) {
+    return null; // Return empty instead of splash screen
+  }
+  
+  // If already signed in, redirect based on profile status
+  if (isSignedIn) {
+    if (user?.unsafeMetadata && Object.keys(user.unsafeMetadata).length > 0) {
+      return <Redirect href="/" />
+    } else {
+      return <Redirect href="/complete-profile" />
+    }
+  }
+
   return (
     <ScrollView 
       style={styles.scrollContainer}
@@ -278,11 +288,12 @@ export default function SignInScreen() {
               onPress={handleGoogleSignIn}
               disabled={isGoogleLoading}
             >
-              {isGoogleLoading ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
+              <Animated.View style={{ opacity: fadeAnim, position: 'absolute' }}>
                 <FontAwesome name="google" size={20} color="white" />
-              )}
+              </Animated.View>
+              <Animated.View style={{ opacity: spinnerFadeAnim }}>
+                <ActivityIndicator size="small" color="white" />
+              </Animated.View>
             </TouchableOpacity>
           </View>
           

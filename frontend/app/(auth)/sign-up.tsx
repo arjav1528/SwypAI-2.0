@@ -3,11 +3,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { GradientText } from '@/components/SplashScreen'
 import { Ionicons, FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, Redirect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useSignUp, useSSO } from '@clerk/clerk-expo'
+import { useSignUp, useSSO, useAuth, useUser } from '@clerk/clerk-expo'
 import * as WebBrowser from 'expo-web-browser'
 import * as AuthSession from 'expo-auth-session'
+import SplashScreen from '@/components/SplashScreen'
 
 const { width, height } = Dimensions.get('window')
 
@@ -26,6 +27,8 @@ export default function SignUpScreen() {
   useWarmUpBrowser()
   
   const { startSSOFlow } = useSSO()
+  const { isSignedIn, isLoaded: isAuthLoaded } = useAuth()
+  const { user, isLoaded: isUserLoaded } = useUser()
   const insets = useSafeAreaInsets()
   const { isLoaded, signUp, setActive } = useSignUp()
   const router = useRouter()
@@ -135,7 +138,7 @@ export default function SignUpScreen() {
   }, [startSSOFlow, setActive, router, clearErrors])
 
   const onSignUpPress = async () => {
-    if (!isLoaded) return
+    if (!isLoaded || !signUp) return
     
     clearErrors()
     setSuccessMessage('')
@@ -192,7 +195,7 @@ export default function SignUpScreen() {
   }
 
   const onVerifyPress = async () => {
-    if (!isLoaded) return
+    if (!isLoaded || !signUp) return
     setCodeError('')
     
     if (!code.trim()) {
@@ -226,6 +229,15 @@ export default function SignUpScreen() {
       } else {
         setCodeError('An error occurred during verification')
       }
+    }
+  }
+
+  // If already signed in, redirect based on profile status
+  if (isSignedIn) {
+    if (user?.unsafeMetadata && Object.keys(user.unsafeMetadata).length > 0) {
+      return <Redirect href="/" />
+    } else {
+      return <Redirect href="/complete-profile" />
     }
   }
 
