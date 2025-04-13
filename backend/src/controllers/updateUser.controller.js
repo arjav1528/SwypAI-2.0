@@ -123,10 +123,10 @@ const dummyData = {
       // const age = req.body.age;
       // const savedQuotes = req.body.savedQuotes;
 
-      const gender = dummyData.data.unsafe_metadata.gender;
-      const preferGenres = dummyData.data.unsafe_metadata.preferGenres;
-      const age = dummyData.data.unsafe_metadata.age;
-      const savedQuotes = dummyData.data.unsafe_metadata.age;
+      const gender = evt.data.unsafe_metadata.gender;
+      const preferGenres = evt.data.unsafe_metadata.preferGenres;
+      const age = evt.data.unsafe_metadata.age;
+      const savedQuotes = evt.data.unsafe_metadata.savedQuotes;
 
       const user = User.findOne({
         clerkId : clerkId
