@@ -122,7 +122,7 @@ const dummyData = {
           ));
       }
 
-      const clerkId = dummyData.data.id;
+      const clerkId = evt.data.id;
       const unsafeMetadata = evt.data.unsafe_metadata || {}; // Add fallback to empty object
       const gender = unsafeMetadata.gender;
       const preferGenres = unsafeMetadata.preferGenres;
