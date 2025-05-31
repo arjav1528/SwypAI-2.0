@@ -5,76 +5,7 @@ const APIResponse = require("../Response/APISuccess");
 const dotenv = require('dotenv')
 dotenv.config();
 
-const dummyData = {
-    "data": {
-      "backup_code_enabled": false,
-      "banned": false,
-      "create_organization_enabled": true,
-      "created_at": 1744276393608,
-      "delete_self_enabled": true,
-      "email_addresses": [
-        {
-          "created_at": 1744276372355,
-          "email_address": "arjav1528@gmail.com",
-          "id": "idn_2vX0zQSkP1QJLcwpcWMxR30cnez",
-          "linked_to": [],
-          "matches_sso_connection": false,
-          "object": "email_address",
-          "reserved": false,
-          "updated_at": 1744276393612,
-          "verification": {
-            "attempts": 1,
-            "expire_at": 1744276972975,
-            "status": "verified",
-            "strategy": "email_code"
-          }
-        }
-      ],
-      "enterprise_accounts": [],
-      "external_accounts": [],
-      "external_id": null,
-      "first_name": null,
-      "has_image": false,
-      "id": "user_2vX11zP5ojq7cTRY58xT6oJqmRG",
-      "image_url": "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCIsImlpZCI6Imluc18ydlUzZkJoeDQ3eWVkZHFLaGQ1dGFUYlVZSUQiLCJyaWQiOiJ1c2VyXzJ2WDExelA1b2pxN2NUUlk1OHhUNm9KcW1SRyJ9",
-      "last_active_at": 1744276393607,
-      "last_name": null,
-      "last_sign_in_at": null,
-      "legal_accepted_at": null,
-      "locked": false,
-      "lockout_expires_in_seconds": null,
-      "mfa_disabled_at": null,
-      "mfa_enabled_at": null,
-      "object": "user",
-      "passkeys": [],
-      "password_enabled": true,
-      "phone_numbers": [],
-      "primary_email_address_id": "idn_2vX0zQSkP1QJLcwpcWMxR30cnez",
-      "primary_phone_number_id": null,
-      "primary_web3_wallet_id": null,
-      "private_metadata": {},
-      "profile_image_url": "https://www.gravatar.com/avatar?d=mp",
-      "public_metadata": {},
-      "saml_accounts": [],
-      "totp_enabled": false,
-      "two_factor_enabled": false,
-      "unsafe_metadata": {},
-      "updated_at": 1744276393626,
-      "username": null,
-      "verification_attempts_remaining": 100,
-      "web3_wallets": []
-    },
-    "event_attributes": {
-      "http_request": {
-        "client_ip": "103.225.100.51",
-        "user_agent": "okhttp/4.12.0"
-      }
-    },
-    "instance_id": "ins_2vU3fBhx47yeddqKhd5taTbUYID",
-    "object": "event",
-    "timestamp": 1744276393644,
-    "type": "user.created"
-  }
+
 
 
   const updateUserController = async (req,res) => {
